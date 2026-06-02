@@ -24,6 +24,7 @@ export function getDb(): Database.Database {
   if (!_db) {
     _db = new Database(DB_PATH);
     _db.pragma("journal_mode = WAL");
+    _db.pragma("busy_timeout = 5000");
     initSchema(_db);
   }
   return _db;

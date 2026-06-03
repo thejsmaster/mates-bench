@@ -1,4 +1,28 @@
-import { getDb, closeDb } from "./db.js";
+/**
+ * Standalone seed script.
+ * Run: npm run seed [products] [users] [orders]
+ *
+ * Deletes all existing data and re-seeds the database with fresh random data.
+ */
+import Database from "better-sqlite3";
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function findProjectRoot(dir: string): string {
+  const root = path.parse(dir).root;
+  let current = dir;
+  while (current !== root) {
+    if (fs.existsSync(path.join(current, "package.json"))) return current;
+    current = path.dirname(current);
+  }
+  return dir;
+}
+
+const PROJECT_ROOT = findProjectRoot(__dirname);
+const DB_PATH = path.resolve(PROJECT_ROOT, "data/bench.db");
 
 const PRODUCT_CATEGORIES = ["Electronics", "Clothing", "Food", "Books", "Sports"];
 const USER_ROLES = ["admin", "user", "moderator"];
@@ -76,14 +100,54 @@ function seedOrders(db: any, count: number, productIds: string[], userIds: strin
 }
 
 async function main() {
-  console.log("Seeding database...");
-  const db = getDb();
+  const db = new Database(DB_PATH);
+  db.pragma("journal_mode = WAL");
 
   const productCount = parseInt(process.argv[2] || "1000", 10);
   const userCount = parseInt(process.argv[3] || "500", 10);
   const orderCount = parseInt(process.argv[4] || "5000", 10);
 
-  db.exec("DELETE FROM orders; DELETE FROM products; DELETE FROM users;");
+  console.log(`Seeding database at ${DB_PATH}...`);
+
+  db.exec("DROP TABLE IF EXISTS orders; DROP TABLE IF EXISTS products; DROP TABLE IF EXISTS users;");
+
+  // Recreate schema
+  db.exec(`
+    CREATE TABLE products (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      price REAL NOT NULL,
+      stock INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+    CREATE INDEX IF NOT EXISTS idx_products_price ON products(price);
+
+    CREATE TABLE users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      role TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+
+    CREATE TABLE orders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      qty INTEGER NOT NULL,
+      total REAL NOT NULL,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (product_id) REFERENCES products(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+    CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at);
+  `);
 
   seedProducts(db, productCount);
   const productIds = db.prepare("SELECT id FROM products").all().map((r: any) => r.id);
@@ -96,7 +160,7 @@ async function main() {
   seedOrders(db, orderCount, productIds, userIds);
   console.log(`  ${orderCount} orders`);
 
-  closeDb();
+  db.close();
   console.log("Done.");
 }
 

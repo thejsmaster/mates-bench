@@ -8,7 +8,7 @@ import { BenchPage } from "./BenchPage.ts";
 export const App = (_: Props<{}>) => {
   // If on /bench, render the BenchPage directly
   if (pathAtom() === "/bench") {
-    return BenchPage;
+    return BenchPage(_);
   }
 
   const productStats = asyncAction(() => getProductStats());

@@ -1,15 +1,20 @@
-import { html, asyncAction, atom, on, pathAtom } from "mates";
+import { html, asyncAction, atom, on, pathAtom, date } from "mates";
 import type { Props } from "mates";
 import { getProductStats, getCategories } from "../server/api/products.ts";
 import { getUserStats } from "../server/api/users.ts";
 import { getOrderStats, getRecentOrders } from "../server/api/orders.ts";
 import { BenchPage } from "./BenchPage.ts";
 
+let t = date().format("hh:mm:ss");
 export const App = (_: Props<{}>) => {
   // If on /bench, render the BenchPage directly
   if (pathAtom() === "/bench") {
     return BenchPage(_);
   }
+
+  console.log(t);
+
+  t = date().format("hh:mm:ss");
 
   const productStats = asyncAction(() => getProductStats());
   const categories = asyncAction(() => getCategories());
